@@ -16,37 +16,67 @@ import { mockApartments } from '../data/mockApartments';
  *   return response.json() as Apartment[];
  */
 export async function searchApartments(filters: SearchFilters): Promise<Apartment[]> {
-  // Simulate network + AI processing delay
-  await new Promise(r => setTimeout(r, 2000));
+  try {
+    const response = await fetch('/api/search-housing', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(filters),
+    });
 
-  let results = [...mockApartments];
-
-  // ── Score each apartment against filters ──────────────────────────────────
-  results = results.map(apt => {
-    let score = apt.aiMatchScore;
-
-    // Budget check — boost if fits, penalize if over
-    const lowestPrice = Math.min(...apt.floorPlans.map(fp => fp.price));
-    if (filters.maxBudget) {
-      if (lowestPrice <= filters.maxBudget) score = Math.min(score + 5, 100);
-      else score = Math.max(score - 20, 0);
+    if (!response.ok) {
+      throw new Error(`Server returned status ${response.status}`);
     }
 
-    // Pets
-    if (filters.petsAllowed && apt.petsAllowed) score = Math.min(score + 5, 100);
-    if (filters.petsAllowed && !apt.petsAllowed) score = Math.max(score - 15, 0);
+    const data = await response.json();
+    return data.listings as Apartment[];
+  } catch (error) {
+    console.error('Error fetching live apartments, falling back to mock data:', error);
 
-    // Parking
-    if (filters.parkingRequired && apt.parkingIncluded) score = Math.min(score + 3, 100);
+    // Simulate standard latency
+    await new Promise(r => setTimeout(r, 1000));
 
-    // Utilities
-    if (filters.utilitiesIncluded && apt.utilitiesIncluded.length > 0) score = Math.min(score + 3, 100);
+    // Fallback: Filter and score mock apartments locally
+    let results = [...mockApartments];
 
-    return { ...apt, aiMatchScore: score };
-  });
+    if (filters.location) {
+      const loc = filters.location.toLowerCase();
+      results = results.filter(
+        apt =>
+          apt.city.toLowerCase().includes(loc) ||
+          apt.state.toLowerCase().includes(loc) ||
+          apt.address.toLowerCase().includes(loc) ||
+          apt.name.toLowerCase().includes(loc)
+      );
+    }
 
-  // Sort by AI match score descending
-  results.sort((a, b) => b.aiMatchScore - a.aiMatchScore);
+    results = results.map(apt => {
+      let score = apt.aiMatchScore;
 
-  return results;
+      // Budget check
+      const lowestPrice = Math.min(...apt.floorPlans.map(fp => fp.price));
+      if (filters.maxBudget) {
+        if (lowestPrice <= filters.maxBudget) score = Math.min(score + 5, 100);
+        else score = Math.max(score - 20, 0);
+      }
+
+      // Pets
+      if (filters.petsAllowed && apt.petsAllowed) score = Math.min(score + 5, 100);
+      if (filters.petsAllowed && !apt.petsAllowed) score = Math.max(score - 15, 0);
+
+      // Parking
+      if (filters.parkingRequired && apt.parkingIncluded) score = Math.min(score + 3, 100);
+
+      // Utilities
+      if (filters.utilitiesIncluded && apt.utilitiesIncluded.length > 0) score = Math.min(score + 3, 100);
+
+      return { ...apt, aiMatchScore: score };
+    });
+
+    // Sort by AI match score descending
+    results.sort((a, b) => b.aiMatchScore - a.aiMatchScore);
+
+    return results;
+  }
 }

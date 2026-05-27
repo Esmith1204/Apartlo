@@ -4,9 +4,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import ApartmentCardCompact from '../components/apartments/ApartmentCardCompact';
 import FloatingFilterPills from '../components/search/FloatingFilterPills';
 import AuthModal from '../components/auth/AuthModal';
-import { mockApartments } from '../data/mockApartments';
+import { searchApartments } from '../services/apartmentService';
 import { useAuth } from '../hooks/useAuth';
 import { useSearch } from '../hooks/useSearch';
+import type { Apartment } from '../types';
+
+const LOADING_STATUSES = [
+  'Initializing live apartment search...',
+  'Tavily AI searching the web for real-time listings...',
+  'Retrieving deep page content from listing directories...',
+  'Gemini 2.5 Flash structuring raw listings into JSON schema...',
+  'Calculating AI compatibility scores and estimating hidden costs...',
+];
 
 export default function ResultsPage() {
   const { query, filters, setFilters } = useSearch();
@@ -14,20 +23,56 @@ export default function ResultsPage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
   const [pillsVisible, setPillsVisible] = useState(false);
+  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusIndex, setStatusIndex] = useState(0);
   const navigate = useNavigate();
 
+  // Cycle through loading status messages
   useEffect(() => {
-    if (!query) navigate('/', { replace: true });
-    else setTimeout(() => setPillsVisible(true), 80);
-  }, []);
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setStatusIndex(prev => (prev + 1) % LOADING_STATUSES.length);
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  // Fetch results live from search service
+  useEffect(() => {
+    if (!query) {
+      navigate('/', { replace: true });
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    setStatusIndex(0);
+
+    searchApartments(filters)
+      .then(results => {
+        if (active) {
+          setApartments(results);
+          setLoading(false);
+          setTimeout(() => setPillsVisible(true), 80);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load live apartments:', err);
+        if (active) {
+          setLoading(false);
+          setTimeout(() => setPillsVisible(true), 80);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [filters, query]);
 
   const openAuth = (tab: 'login' | 'register' = 'register') => {
     setAuthTab(tab);
     setAuthOpen(true);
   };
-
-  // Sort by match score by default
-  const sorted = [...mockApartments].sort((a, b) => b.aiMatchScore - a.aiMatchScore);
 
   return (
     <>
@@ -100,7 +145,7 @@ export default function ResultsPage() {
         <div className="results-meta-row">
           <span className="results-count-label">
             <Sparkles size={14} />
-            {sorted.length} apartments found
+            {loading ? 'Searching...' : `${apartments.length} apartments found`}
             {filters.location && <> near <strong>{filters.location}</strong></>}
           </span>
           {!isAuthenticated && (
@@ -111,14 +156,54 @@ export default function ResultsPage() {
         </div>
 
         {/* ── Compact card grid ─────────────────────────────────────────────── */}
-        {sorted.length === 0 ? (
+        {loading ? (
+          <div className="results-loading-container">
+            {/* Glassmorphic loader overlay */}
+            <div className="results-loader-overlay">
+              <div className="results-loader-content">
+                <div className="results-loader-glow" />
+                <div className="results-loader-circle">
+                  <Sparkles className="results-loader-sparkle-icon" size={28} />
+                </div>
+                <h2 className="results-loader-title">Finding Live Listings</h2>
+                <div className="results-loader-progress-bar">
+                  <div
+                    className="results-loader-progress-fill"
+                    style={{ width: `${(statusIndex + 1) * 20}%` }}
+                  />
+                </div>
+                <p key={statusIndex} className="results-loader-text">
+                  {LOADING_STATUSES[statusIndex]}
+                </p>
+              </div>
+            </div>
+
+            {/* Pulsing skeletons in the background */}
+            <div className="results-grid" aria-hidden="true">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="apt-compact-card skeleton-card-compact">
+                  <div className="skeleton-img-placeholder" />
+                  <div className="skeleton-info-placeholder">
+                    <div className="skeleton-line skeleton-title" />
+                    <div className="skeleton-line skeleton-text" />
+                    <div className="skeleton-chips">
+                      <div className="skeleton-chip" />
+                      <div className="skeleton-chip" />
+                      <div className="skeleton-chip" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : apartments.length === 0 ? (
           <div className="results-empty">
             <Home size={40} />
             <p>No apartments match your filters. Try adjusting them above.</p>
           </div>
         ) : (
           <div className="results-grid" aria-label="Apartment listings">
-            {sorted.map(apt => (
+            {apartments.map(apt => (
               <ApartmentCardCompact
                 key={apt.id}
                 apartment={apt}
