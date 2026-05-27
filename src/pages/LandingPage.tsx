@@ -1,143 +1,181 @@
-import { Link } from 'react-router-dom';
-import { Shield, Eye, Zap, GraduationCap, ArrowRight, Star } from 'lucide-react';
-import HeroSearch from '../components/search/HeroSearch';
-import ApartmentGrid from '../components/apartments/ApartmentGrid';
-import { mockApartments } from '../data/mockApartments';
+import { useState, useRef, useEffect } from 'react';
+import { ArrowRight, Sparkles, LogIn, LogOut, Bookmark } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import AuthModal from '../components/auth/AuthModal';
+import { useAuth } from '../hooks/useAuth';
+import { useSearch, parsePrompt } from '../hooks/useSearch';
 
-const HOW_IT_WORKS = [
-  {
-    step: '01',
-    icon: '🔍',
-    title: 'Describe what you need',
-    desc: 'Type naturally — your budget, bedrooms, pets, location. Our AI understands you.',
-  },
-  {
-    step: '02',
-    icon: '✦',
-    title: 'AI builds your filters',
-    desc: 'Apartlo extracts your preferences automatically. Tweak anything before searching.',
-  },
-  {
-    step: '03',
-    icon: '🏠',
-    title: 'See the full picture',
-    desc: 'Results surface hidden costs, real reviews, and exactly which of your needs each listing meets.',
-  },
-];
-
-const VALUE_PROPS = [
-  {
-    icon: <Shield size={24} />,
-    title: 'No Hidden Surprises',
-    desc: 'Security deposits, insurance requirements, parking fees, utility estimates — we surface it all upfront.',
-  },
-  {
-    icon: <Eye size={24} />,
-    title: 'Transparent Costs',
-    desc: 'See the true monthly cost of every apartment, not just the advertised rent.',
-  },
-  {
-    icon: <Zap size={24} />,
-    title: 'AI-Powered Matching',
-    desc: 'Every result is scored against your filters so you know at a glance what fits and what doesn\'t.',
-  },
-  {
-    icon: <GraduationCap size={24} />,
-    title: 'Built for Students',
-    desc: 'Flexible leases, roommate-friendly options, and campus proximity all built into the search.',
-  },
+/* ── Quick-suggestion chips shown under the prompt ────────────────────────── */
+const SUGGESTIONS = [
+  '2 bed under $1,500, pet friendly',
+  'Studio near campus, utilities included',
+  'Furnished 1BR, parking, max $1,200',
+  'Roommate-friendly 3BR, no pet deposit',
 ];
 
 export default function LandingPage() {
-  const featured = mockApartments.slice(0, 3);
+  const { query, setQuery, setFilters } = useSearch();
+  const { isAuthenticated, user, logout } = useAuth();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const navigate = useNavigate();
+
+  const handlePromptSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    const parsed = parsePrompt(query);
+    setFilters(parsed);
+    navigate('/filters');
+  };
+
+  const handleSuggestion = (text: string) => {
+    setQuery(text);
+    const parsed = parsePrompt(text);
+    setFilters(parsed);
+    navigate('/filters');
+  };
+
+  // Auto-focus prompt on load
+  useEffect(() => {
+    setTimeout(() => promptRef.current?.focus(), 400);
+  }, []);
+
+  const openAuth = (tab: 'login' | 'register' = 'login') => {
+    setAuthTab(tab);
+    setAuthOpen(true);
+  };
 
   return (
-    <main id="main-content">
-      {/* Hero */}
-      <HeroSearch />
+    <>
+      {/* Deep navy background layers */}
+      <div className="landing-bg" aria-hidden="true">
+        <div className="landing-blob lb-1" />
+        <div className="landing-blob lb-2" />
+        <div className="landing-blob lb-3" />
+        <div className="landing-grid" />
+      </div>
 
-      {/* How It Works */}
-      <section className="section how-it-works" aria-labelledby="how-heading">
-        <div className="section-inner">
-          <div className="section-label">Simple Process</div>
-          <h2 id="how-heading" className="section-title">How Apartlo works</h2>
-          <p className="section-subtitle">From search to signed lease in three steps.</p>
-          <div className="how-grid">
-            {HOW_IT_WORKS.map(step => (
-              <div key={step.step} className="how-card">
-                <div className="how-step-num">{step.step}</div>
-                <div className="how-icon">{step.icon}</div>
-                <h3 className="how-title">{step.title}</h3>
-                <p className="how-desc">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Value Props */}
-      <section className="section value-props" aria-labelledby="value-heading">
-        <div className="section-inner">
-          <div className="section-label">Why Apartlo?</div>
-          <h2 id="value-heading" className="section-title">Everything students deserve to know</h2>
-          <div className="value-grid">
-            {VALUE_PROPS.map(vp => (
-              <div key={vp.title} className="value-card">
-                <div className="value-icon">{vp.icon}</div>
-                <h3 className="value-title">{vp.title}</h3>
-                <p className="value-desc">{vp.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonial strip */}
-      <section className="section testimonial-strip" aria-label="Student testimonials">
-        <div className="section-inner">
-          <div className="testimonial-row">
-            {[
-              { quote: 'Finally found a place that was actually in my budget — because I could see ALL the fees upfront.', author: 'Mia K., Ohio State Junior' },
-              { quote: 'The AI filters saved me 3 hours of searching. I just typed what I wanted and it just worked.', author: 'Jordan T., Michigan State Sophomore' },
-              { quote: 'I bookmarked 5 places and showed them side-by-side. Best apartment hunting experience I\'ve had.', author: 'Priya S., UNC Senior' },
-            ].map(t => (
-              <div key={t.author} className="testimonial-card">
-                <div className="testimonial-stars">
-                  {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={13} fill="#f59e0b" stroke="none" />)}
-                </div>
-                <p className="testimonial-quote">"{t.quote}"</p>
-                <span className="testimonial-author">— {t.author}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Listings */}
-      <section className="section featured-listings" aria-labelledby="featured-heading">
-        <div className="section-inner">
-          <div className="section-label">Sample Results</div>
-          <h2 id="featured-heading" className="section-title">See what Apartlo finds</h2>
-          <p className="section-subtitle">Real apartment data with hidden costs exposed. No account needed to browse.</p>
-          <ApartmentGrid apartments={featured} />
-          <div className="featured-cta">
-            <Link to="/search" id="landing-search-cta" className="btn btn-primary btn-lg">
-              Search All Apartments <ArrowRight size={18} />
+      {/* Corner auth button */}
+      <div className="landing-corner-auth">
+        {isAuthenticated ? (
+          <div className="landing-user-menu">
+            <div className="landing-avatar">
+              {user?.avatar
+                ? <img src={user.avatar} alt={user.name} />
+                : <span>{user?.name?.charAt(0).toUpperCase()}</span>
+              }
+            </div>
+            <span className="landing-user-name">{user?.name?.split(' ')[0]}</span>
+            <Link to="/bookmarks" className="landing-corner-btn" aria-label="Bookmarks">
+              <Bookmark size={15} />
             </Link>
+            <button className="landing-corner-btn" onClick={logout} aria-label="Sign out">
+              <LogOut size={15} />
+            </button>
           </div>
-        </div>
-      </section>
+        ) : (
+          <button
+            id="landing-signin-btn"
+            className="landing-signin-btn"
+            onClick={() => openAuth('login')}
+          >
+            <LogIn size={15} />
+            Sign In
+          </button>
+        )}
+      </div>
 
-      {/* Bottom CTA Banner */}
-      <section className="cta-banner" aria-labelledby="cta-heading">
-        <div className="cta-banner-inner">
-          <h2 id="cta-heading" className="cta-title">Ready to find your next home?</h2>
-          <p className="cta-subtitle">Join thousands of students who found their apartment through Apartlo.</p>
-          <Link to="/search" id="landing-bottom-cta" className="btn btn-primary btn-lg">
-            Start your search <ArrowRight size={18} />
-          </Link>
+      {/* Hero content */}
+      <div className="hero-prompt-content">
+        {/* Logo */}
+        <div className="hero-logo-wrap">
+          <svg width="48" height="48" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 3L2 14h4v15h8v-9h4v9h8V14h4L16 3z" fill="url(#landLogoGrad)" />
+            <circle cx="24" cy="24" r="6" fill="rgba(10,14,35,0.95)" />
+            <path d="M24 20.5c-1.5-1.5-4 .5-4 2.5 0 1.5 1.5 2.5 4 4 2.5-1.5 4-2.5 4-4 0-2-2.5-4-4-2.5z" fill="#ff6b6b" />
+            <defs>
+              <linearGradient id="landLogoGrad" x1="2" y1="3" x2="30" y2="29" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#5b8dee" />
+                <stop offset="1" stopColor="#3b6fd4" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span className="hero-wordmark">Apartlo</span>
         </div>
-      </section>
-    </main>
+
+        <h1 className="hero-prompt-title">
+          Find your next apartment.<br />
+          <span className="hero-prompt-gradient">Just describe it.</span>
+        </h1>
+        <p className="hero-prompt-subtitle">
+          Tell us what you're looking for — budget, size, location, preferences.
+          We'll build your filters and surface the full picture.
+        </p>
+
+        {/* Prompt form */}
+        <form
+          id="hero-prompt-form"
+          className="hero-prompt-form"
+          onSubmit={handlePromptSubmit}
+          aria-label="Apartment search prompt"
+        >
+          <div className="hero-prompt-box">
+            <Sparkles size={18} className="hero-prompt-sparkle" aria-hidden="true" />
+            <textarea
+              ref={promptRef}
+              id="hero-prompt-input"
+              className="hero-prompt-textarea"
+              placeholder="e.g. 2 bed under $1,500/mo, pet friendly, near Ohio State, parking included…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (query.trim()) {
+                    const parsed = parsePrompt(query);
+                    setFilters(parsed);
+                    navigate('/filters');
+                  }
+                }
+              }}
+              rows={3}
+              aria-label="Describe your ideal apartment"
+            />
+            <button
+              id="hero-prompt-submit"
+              type="submit"
+              className="hero-prompt-submit"
+              disabled={!query.trim()}
+              aria-label="Search apartments"
+            >
+              <ArrowRight size={20} />
+            </button>
+          </div>
+        </form>
+
+        {/* Quick suggestions */}
+        <div className="hero-suggestions" aria-label="Quick searches">
+          <span className="hero-suggestions-label">Try:</span>
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              className="hero-suggestion-chip"
+              onClick={() => handleSuggestion(s)}
+              type="button"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Auth modal */}
+      <AuthModal
+        isOpen={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialTab={authTab}
+      />
+    </>
   );
 }
